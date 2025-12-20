@@ -35,8 +35,11 @@ export const startGame = (roomId) => api.post('/game/start', { roomId });
 export const submitCode = (data) => api.post('/game/submit', data);
 export const runCode = (data) => api.post('/game/run', data);
 
-// User / Profile
+// User
 export const getUserProfile = (id) => api.get(`/users/${id}`);
 export const updateUserProfile = (data) => api.put('/users/update', data);
+
+// --- NEW: AI Analysis ---
+export const analyzeCode = (data) => api.post('/ai/analyze', data);
 
 export default api;

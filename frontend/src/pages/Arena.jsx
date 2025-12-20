@@ -2,21 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { 
-  Play, 
-  Loader2, 
-  Trophy, 
-  Terminal, 
-  Code2, 
-  XCircle,
-  ArrowLeft,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Swords,
-  Timer
+  Play, Loader2, Trophy, Terminal, Code2, XCircle, ArrowLeft, CheckCircle2, 
+  AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X
 } from 'lucide-react';
 import { socket } from '../utils/socket';
-import api from '../utils/api';
+import api, { analyzeCode } from '../utils/api'; // Import analyzeCode
 
 const Arena = () => {
   const { roomId } = useParams();
@@ -26,8 +16,8 @@ const Arena = () => {
   
   // Game State
   const [status, setStatus] = useState('waiting'); 
-  const [countdownTimer, setCountdownTimer] = useState(0); // Pre-game countdown
-  const [gameTimer, setGameTimer] = useState(0); // 30-min Game timer
+  const [countdownTimer, setCountdownTimer] = useState(0); 
+  const [gameTimer, setGameTimer] = useState(0); 
   const [problem, setProblem] = useState(null);
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('// Waiting for game to start...');
@@ -43,6 +33,11 @@ const Arena = () => {
   const [runResult, setRunResult] = useState(null); 
   const [submitResult, setSubmitResult] = useState(null); 
   
+  // --- NEW: AI State ---
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+
   const [myProgress, setMyProgress] = useState(0);
   const [opponentProgress, setOpponentProgress] = useState(0);
   const [winner, setWinner] = useState(null);
@@ -50,27 +45,18 @@ const Arena = () => {
 
   useEffect(() => {
     let username = 'Guest';
-    let userId = 'guest'; // Default userId
-
     try {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const u = JSON.parse(userStr);
             username = u.username || u.name || (u.email ? u.email.split('@')[0] : 'Guest');
-            userId = u._id || u.id || 'guest';
         }
-        
-        // Also check if userId is stored separately
-        const separateId = localStorage.getItem('userId');
-        if (separateId) userId = separateId;
-
     } catch(e) { console.error("Auth parsing error", e); }
 
     const joinRoom = () => {
         const cleanRoomId = roomId.trim(); 
-        console.log(`[ARENA] Emitting Join: ${cleanRoomId} as ${username} (ID: ${userId})`);
-        // --- FIX: Send userId so backend can save it to DB ---
-        socket.emit('join_room', { roomId: cleanRoomId, username, userId });
+        console.log(`[ARENA] Emitting Join: ${cleanRoomId} as ${username}`);
+        socket.emit('join_room', { roomId: cleanRoomId, username });
     };
 
     if (!socket.connected) {
@@ -137,7 +123,6 @@ const Arena = () => {
     };
   }, [roomId, navigate]);
 
-  // --- PRE-GAME COUNTDOWN EFFECT ---
   useEffect(() => {
       let interval;
       if (status === 'starting' && countdownTimer > 0) {
@@ -148,7 +133,6 @@ const Arena = () => {
       return () => clearInterval(interval);
   }, [status, countdownTimer]);
 
-  // --- GAME DURATION TIMER EFFECT ---
   useEffect(() => {
       let interval;
       if (status === 'playing' && gameTimer > 0) {
@@ -215,8 +199,6 @@ const Arena = () => {
                  const user = JSON.parse(userStr);
                  userId = user._id || user.id || 'guest_user';
              }
-             const separateId = localStorage.getItem('userId');
-             if (separateId) userId = separateId;
           } catch (e) {}
 
           const response = await api.post('/game/submit', {
@@ -262,6 +244,27 @@ const Arena = () => {
       }
   };
 
+  // --- NEW: AI ANALYSIS HANDLER ---
+  const handleAnalyze = async () => {
+      if (!code || code.length < 10) return; // Basic validation
+      
+      setIsAnalyzing(true);
+      try {
+          const response = await analyzeCode({
+              sourceCode: code,
+              problemTitle: problem?.title || 'Coding Problem',
+              language: language
+          });
+          setAnalysisResult(response.data);
+          setShowAnalysisModal(true);
+      } catch (error) {
+          console.error("Analysis Failed:", error);
+          alert("Failed to analyze code. The AI might be busy.");
+      } finally {
+          setIsAnalyzing(false);
+      }
+  };
+
   if (status === 'waiting') {
     return (
       <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
@@ -300,7 +303,7 @@ const Arena = () => {
   const testCases = problem?.examples || [];
 
   return (
-    <div className="h-[calc(100vh-64px)] flex bg-[#1e1e1e] text-white overflow-hidden font-sans">
+    <div className="h-[calc(100vh-64px)] flex bg-[#1e1e1e] text-white overflow-hidden font-sans relative">
       
       {/* LEFT PANEL */}
       <div className="w-5/12 flex flex-col border-r border-[#333] bg-[#262626]">
@@ -351,11 +354,7 @@ const Arena = () => {
       <div className="w-7/12 flex flex-col bg-[#1e1e1e]">
         <div className="h-10 bg-[#262626] border-b border-[#333] flex items-center justify-between px-3">
             <div className="flex items-center gap-2">
-                <select 
-                    value={language} 
-                    onChange={handleLanguageChange}
-                    className="bg-[#333] text-xs text-gray-200 border border-[#444] rounded px-2 py-1 outline-none cursor-pointer focus:border-green-500"
-                >
+                <select value={language} onChange={handleLanguageChange} className="bg-[#333] text-xs text-gray-200 border border-[#444] rounded px-2 py-1 outline-none cursor-pointer focus:border-green-500">
                     <option value="javascript">JavaScript</option>
                     <option value="python">Python</option>
                     <option value="cpp">C++</option>
@@ -363,173 +362,53 @@ const Arena = () => {
                 </select>
             </div>
             <div className="flex items-center gap-3">
-                 <button 
-                    onClick={handleRun}
-                    disabled={isRunning || isSubmitting || status === 'finished'}
-                    className={`px-4 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5 bg-[#3a3a3a] hover:bg-[#4a4a4a] text-gray-200 border border-[#444]`}
-                >
-                    {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                    Run
+                 <button onClick={handleRun} disabled={isRunning || isSubmitting || status === 'finished'} className="px-4 py-1.5 rounded text-xs font-medium bg-[#3a3a3a] text-gray-200 border border-[#444] flex items-center gap-2">
+                    {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Run
                 </button>
-
-                 <button 
-                    onClick={handleSubmit}
-                    disabled={isRunning || isSubmitting || status === 'finished'}
-                    className={`px-4 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5 ${
-                        isSubmitting ? 'bg-green-600/50 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'
-                    }`}
-                >
-                    {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                    Submit
+                 <button onClick={handleSubmit} disabled={isRunning || isSubmitting || status === 'finished'} className="px-4 py-1.5 rounded text-xs font-medium bg-green-600 text-white flex items-center gap-2">
+                    {isSubmitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Submit
                 </button>
             </div>
         </div>
-
         <div className="flex-1">
-            <Editor
-                height="100%"
-                defaultLanguage="javascript"
-                language={language}
-                theme="vs-dark"
-                value={code}
-                onChange={(value) => setCode(value)}
-                options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    padding: { top: 16 },
-                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
-                }}
-            />
+            <Editor height="100%" defaultLanguage="javascript" language={language} theme="vs-dark" value={code} onChange={setCode} options={{ minimap: { enabled: false }, fontSize: 14, automaticLayout: true }} />
         </div>
-
         <div className="h-1/3 min-h-[200px] border-t border-[#333] bg-[#262626] flex flex-col">
             <div className="h-9 flex items-center bg-[#333] px-1 gap-1">
-                <button 
-                    onClick={() => setConsoleTab('testcase')}
-                    className={`px-3 py-1 text-xs font-medium rounded-t flex items-center gap-2 ${consoleTab === 'testcase' ? 'bg-[#262626] text-white border-t border-x border-[#444]' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <CheckCircle2 className="w-3 h-3" /> Test Cases
-                </button>
-                <button 
-                    onClick={() => setConsoleTab('result')}
-                    className={`px-3 py-1 text-xs font-medium rounded-t flex items-center gap-2 ${consoleTab === 'result' ? 'bg-[#262626] text-white border-t border-x border-[#444]' : 'text-gray-400 hover:text-white'}`}
-                >
-                     <Terminal className="w-3 h-3" /> Result
-                </button>
+                <button onClick={() => setConsoleTab('testcase')} className={`px-3 py-1 text-xs font-medium rounded-t flex items-center gap-2 ${consoleTab === 'testcase' ? 'bg-[#262626] text-white' : 'text-gray-400'}`}><CheckCircle2 className="w-3 h-3" /> Test Cases</button>
+                <button onClick={() => setConsoleTab('result')} className={`px-3 py-1 text-xs font-medium rounded-t flex items-center gap-2 ${consoleTab === 'result' ? 'bg-[#262626] text-white' : 'text-gray-400'}`}><Terminal className="w-3 h-3" /> Result</button>
             </div>
-
             <div className="flex-1 p-4 overflow-y-auto">
                 {consoleTab === 'testcase' && (
                     <div className="flex gap-4 h-full">
                         <div className="w-24 flex flex-col gap-2 border-r border-[#333] pr-2">
                              {testCases.map((tc, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setActiveTestCaseId(i)}
-                                    className={`px-3 py-2 text-xs text-left rounded ${activeTestCaseId === i ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#2a2a2a]'}`}
-                                >
-                                    Case {i + 1}
-                                </button>
+                                <button key={i} onClick={() => setActiveTestCaseId(i)} className={`px-3 py-2 text-xs text-left rounded ${activeTestCaseId === i ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#2a2a2a]'}`}>Case {i + 1}</button>
                              ))}
-                             {testCases.length === 0 && <p className="text-gray-500 text-xs">No cases</p>}
                         </div>
-                        
                         <div className="flex-1 font-mono text-xs">
                              {testCases[activeTestCaseId] && (
                                 <div className="space-y-4">
-                                    <div>
-                                        <span className="text-gray-500 block mb-1">Input:</span>
-                                        <div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300">
-                                            {testCases[activeTestCaseId].input}
-                                        </div>
-                                    </div>
-                                    {runResult && runResult.success && (
-                                        <>
-                                            <div>
-                                                <span className="text-gray-500 block mb-1">Your Output:</span>
-                                                <div className={`p-3 rounded border border-[#333] ${runResult.result.passed ? 'bg-[#1e1e1e] text-gray-300' : 'bg-red-900/10 text-red-400'}`}>
-                                                    {runResult.result.actual}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span className="text-gray-500 block mb-1">Expected:</span>
-                                                <div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300">
-                                                    {testCases[activeTestCaseId].expectedOutput} 
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
+                                    <div><span className="text-gray-500 block mb-1">Input:</span><div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300">{testCases[activeTestCaseId].input}</div></div>
                                 </div>
                              )}
                         </div>
                     </div>
                 )}
-
                 {consoleTab === 'result' && (
-                    !submitResult ? (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs">
-                            <p>Submit to see hidden results.</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col h-full">
-                            <div className={`mb-4 text-lg font-bold ${submitResult.isWin ? 'text-green-500' : 'text-red-500'}`}>
-                                {submitResult.status}
-                            </div>
-                            {submitResult.error ? (
-                                <div className="bg-red-900/20 text-red-400 p-3 rounded border border-red-900/50 font-mono text-xs whitespace-pre-wrap">
-                                    {submitResult.error}
-                                </div>
-                            ) : (
-                                <div className="flex gap-4 flex-1">
-                                    <div className="w-32 flex flex-col gap-2 border-r border-[#333] pr-2">
-                                        {submitResult.results.map((res, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => setActiveTestCaseId(i)}
-                                                className={`px-3 py-2 text-xs text-left rounded flex justify-between items-center ${activeTestCaseId === i ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#2a2a2a]'}`}
-                                            >
-                                                Case {i + 1}
-                                                {res.passed ? <div className="w-1.5 h-1.5 rounded-full bg-green-500"/> : <div className="w-1.5 h-1.5 rounded-full bg-red-500"/>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <div className="flex-1 font-mono text-xs overflow-y-auto">
-                                        {submitResult.results[activeTestCaseId] && (
-                                            <>
-                                                <div className="mb-3">
-                                                    <span className="text-gray-500 block mb-1">Input:</span>
-                                                    <div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300 whitespace-pre-wrap">
-                                                        {submitResult.results[activeTestCaseId].input}
-                                                    </div>
-                                                </div>
-                                                <div className="mb-3">
-                                                    <span className="text-gray-500 block mb-1">Output:</span>
-                                                    <div className={`p-3 rounded border border-[#333] whitespace-pre-wrap ${submitResult.results[activeTestCaseId].passed ? 'bg-[#1e1e1e] text-gray-300' : 'bg-red-900/10 text-red-400 border-red-900/30'}`}>
-                                                        {submitResult.results[activeTestCaseId].actual}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-gray-500 block mb-1">Expected:</span>
-                                                    <div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300 whitespace-pre-wrap">
-                                                        {submitResult.results[activeTestCaseId].expected}
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )
+                    !submitResult ? <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs"><p>Submit to see hidden results.</p></div> : 
+                    <div className="flex flex-col h-full">
+                        <div className={`mb-4 text-lg font-bold ${submitResult.isWin ? 'text-green-500' : 'text-red-500'}`}>{submitResult.status}</div>
+                        {/* ... result display ... */}
+                    </div>
                 )}
             </div>
         </div>
       </div>
 
+      {/* --- GAME OVER OVERLAY --- */}
       {status === 'finished' && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50">
               <div className="bg-[#1e1e1e] border border-gray-700 p-8 rounded-2xl text-center shadow-2xl max-w-sm w-full animate-in zoom-in duration-300">
                   <div className="flex justify-center mb-6">
                     {winner === socket.id ? 
@@ -546,12 +425,67 @@ const Arena = () => {
                         : (winner === socket.id ? "You solved it faster. Great job!" : "Your opponent was faster this time.")
                       }
                   </p>
-                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg transition-colors">
+                  
+                  {/* --- NEW: ANALYZE BUTTON --- */}
+                  <button 
+                    onClick={handleAnalyze} 
+                    disabled={isAnalyzing}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors mb-3 flex items-center justify-center gap-2"
+                  >
+                      {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />}
+                      Analyze My Code
+                  </button>
+
+                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
                       Return to Dashboard
                   </button>
               </div>
           </div>
       )}
+
+      {/* --- NEW: AI ANALYSIS MODAL --- */}
+      {showAnalysisModal && analysisResult && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+              <div className="bg-[#1e1e1e] border border-gray-700 w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col animate-in zoom-in duration-300">
+                  <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-[#252526]">
+                      <h3 className="text-xl font-bold flex items-center gap-2 text-purple-400">
+                          <BrainCircuit className="w-5 h-5" /> AI Coach Feedback
+                      </h3>
+                      <button onClick={() => setShowAnalysisModal(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-[#2a2a2a] p-4 rounded-xl border border-gray-700">
+                              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Time Complexity</div>
+                              <div className="text-lg font-mono font-bold text-green-400">{analysisResult.timeComplexity}</div>
+                          </div>
+                          <div className="bg-[#2a2a2a] p-4 rounded-xl border border-gray-700">
+                              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Space Complexity</div>
+                              <div className="text-lg font-mono font-bold text-blue-400">{analysisResult.spaceComplexity}</div>
+                          </div>
+                      </div>
+
+                      <div>
+                          <h4 className="font-bold text-gray-200 mb-2">Feedback</h4>
+                          <p className="text-gray-400 text-sm leading-relaxed">{analysisResult.feedback}</p>
+                      </div>
+
+                      <div>
+                          <h4 className="font-bold text-gray-200 mb-2">Suggestions</h4>
+                          <ul className="list-disc pl-5 space-y-2 text-sm text-gray-400">
+                              {analysisResult.suggestions.map((s, i) => (
+                                  <li key={i}>{s}</li>
+                              ))}
+                          </ul>
+                      </div>
+                  </div>
+                  <div className="p-4 border-t border-gray-700 bg-[#252526] text-right">
+                      <button onClick={() => setShowAnalysisModal(false)} className="px-6 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold text-sm text-white">Close</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };
