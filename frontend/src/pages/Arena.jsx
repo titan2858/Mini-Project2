@@ -6,7 +6,7 @@ import {
   AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X
 } from 'lucide-react';
 import { socket } from '../utils/socket';
-import api, { analyzeCode } from '../utils/api'; // Import analyzeCode
+import api, { analyzeCode } from '../utils/api';
 
 const Arena = () => {
   const { roomId } = useParams();
@@ -33,7 +33,7 @@ const Arena = () => {
   const [runResult, setRunResult] = useState(null); 
   const [submitResult, setSubmitResult] = useState(null); 
   
-  // --- NEW: AI State ---
+  // AI State
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
@@ -45,18 +45,31 @@ const Arena = () => {
 
   useEffect(() => {
     let username = 'Guest';
+    let userId = 'guest'; // Default ID
+
+    // --- FIX: Retrieve User ID correctly ---
     try {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const u = JSON.parse(userStr);
             username = u.username || u.name || (u.email ? u.email.split('@')[0] : 'Guest');
+            userId = u._id || u.id || 'guest';
         }
+        
+        // Handle separate keys if used
+        const storedName = localStorage.getItem('username');
+        if(storedName) username = storedName;
+        
+        const storedId = localStorage.getItem('userId');
+        if(storedId) userId = storedId;
+
     } catch(e) { console.error("Auth parsing error", e); }
 
     const joinRoom = () => {
         const cleanRoomId = roomId.trim(); 
-        console.log(`[ARENA] Emitting Join: ${cleanRoomId} as ${username}`);
-        socket.emit('join_room', { roomId: cleanRoomId, username });
+        console.log(`[ARENA] Emitting Join: ${cleanRoomId} as ${username} (ID: ${userId})`);
+        // --- FIX: Pass userId to socket ---
+        socket.emit('join_room', { roomId: cleanRoomId, username, userId });
     };
 
     if (!socket.connected) {
@@ -192,6 +205,7 @@ const Arena = () => {
       setRunResult(null);
 
       try {
+          // --- FIX: Robust ID Extraction for Submission ---
           let userId = 'guest_user';
           try {
              const userStr = localStorage.getItem('user');
@@ -199,6 +213,8 @@ const Arena = () => {
                  const user = JSON.parse(userStr);
                  userId = user._id || user.id || 'guest_user';
              }
+             const separateId = localStorage.getItem('userId');
+             if (separateId) userId = separateId;
           } catch (e) {}
 
           const response = await api.post('/game/submit', {
@@ -244,9 +260,9 @@ const Arena = () => {
       }
   };
 
-  // --- NEW: AI ANALYSIS HANDLER ---
+  // --- AI ANALYSIS HANDLER ---
   const handleAnalyze = async () => {
-      if (!code || code.length < 10) return; // Basic validation
+      if (!code || code.length < 10) return; 
       
       setIsAnalyzing(true);
       try {
@@ -399,7 +415,28 @@ const Arena = () => {
                     !submitResult ? <div className="h-full flex flex-col items-center justify-center text-gray-500 text-xs"><p>Submit to see hidden results.</p></div> : 
                     <div className="flex flex-col h-full">
                         <div className={`mb-4 text-lg font-bold ${submitResult.isWin ? 'text-green-500' : 'text-red-500'}`}>{submitResult.status}</div>
-                        {/* ... result display ... */}
+                        {submitResult.error ? (
+                            <div className="bg-red-900/20 text-red-400 p-3 rounded border border-red-900/50 font-mono text-xs whitespace-pre-wrap">{submitResult.error}</div>
+                        ) : (
+                            <div className="flex gap-4 flex-1">
+                                <div className="w-32 flex flex-col gap-2 border-r border-[#333] pr-2">
+                                    {submitResult.results.map((res, i) => (
+                                        <button key={i} onClick={() => setActiveTestCaseId(i)} className={`px-3 py-2 text-xs text-left rounded flex justify-between items-center ${activeTestCaseId === i ? 'bg-[#333] text-white' : 'text-gray-400 hover:bg-[#2a2a2a]'}`}>
+                                            Case {i + 1} {res.passed ? <div className="w-1.5 h-1.5 rounded-full bg-green-500"/> : <div className="w-1.5 h-1.5 rounded-full bg-red-500"/>}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex-1 font-mono text-xs overflow-y-auto">
+                                    {submitResult.results[activeTestCaseId] && (
+                                        <>
+                                            <div className="mb-3"><span className="text-gray-500 block mb-1">Input:</span><div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300 whitespace-pre-wrap">{submitResult.results[activeTestCaseId].input}</div></div>
+                                            <div className="mb-3"><span className="text-gray-500 block mb-1">Output:</span><div className={`p-3 rounded border border-[#333] whitespace-pre-wrap ${submitResult.results[activeTestCaseId].passed ? 'bg-[#1e1e1e] text-gray-300' : 'bg-red-900/10 text-red-400 border-red-900/30'}`}>{submitResult.results[activeTestCaseId].actual}</div></div>
+                                            <div><span className="text-gray-500 block mb-1">Expected:</span><div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300 whitespace-pre-wrap">{submitResult.results[activeTestCaseId].expected}</div></div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -426,14 +463,8 @@ const Arena = () => {
                       }
                   </p>
                   
-                  {/* --- NEW: ANALYZE BUTTON --- */}
-                  <button 
-                    onClick={handleAnalyze} 
-                    disabled={isAnalyzing}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors mb-3 flex items-center justify-center gap-2"
-                  >
-                      {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />}
-                      Analyze My Code
+                  <button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors mb-3 flex items-center justify-center gap-2">
+                      {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />} Analyze My Code
                   </button>
 
                   <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
@@ -443,7 +474,7 @@ const Arena = () => {
           </div>
       )}
 
-      {/* --- NEW: AI ANALYSIS MODAL --- */}
+      {/* --- AI ANALYSIS MODAL --- */}
       {showAnalysisModal && analysisResult && (
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
               <div className="bg-[#1e1e1e] border border-gray-700 w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col animate-in zoom-in duration-300">
@@ -464,18 +495,14 @@ const Arena = () => {
                               <div className="text-lg font-mono font-bold text-blue-400">{analysisResult.spaceComplexity}</div>
                           </div>
                       </div>
-
                       <div>
                           <h4 className="font-bold text-gray-200 mb-2">Feedback</h4>
                           <p className="text-gray-400 text-sm leading-relaxed">{analysisResult.feedback}</p>
                       </div>
-
                       <div>
                           <h4 className="font-bold text-gray-200 mb-2">Suggestions</h4>
                           <ul className="list-disc pl-5 space-y-2 text-sm text-gray-400">
-                              {analysisResult.suggestions.map((s, i) => (
-                                  <li key={i}>{s}</li>
-                              ))}
+                              {analysisResult.suggestions.map((s, i) => <li key={i}>{s}</li>)}
                           </ul>
                       </div>
                   </div>
@@ -485,7 +512,6 @@ const Arena = () => {
               </div>
           </div>
       )}
-
     </div>
   );
 };
