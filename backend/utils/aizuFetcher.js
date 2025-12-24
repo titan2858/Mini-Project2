@@ -59,75 +59,64 @@ const getAizuProblem = async () => {
             return null;
         }
 
-        // Parse HTML to extract test cases
+        // Parse HTML
         const $ = cheerio.load(htmlContent);
 
+        // --- EXTRACT REAL TITLE ---
+        // Try to find the h1 tag which usually contains the title
+        let realTitle = $('h1').first().text().trim();
+        
+        // If no h1, fallback to h2
+        if (!realTitle) {
+            realTitle = $('h2').first().text().trim();
+        }
+
+        // Cleanup: Remove the title from the description HTML so it doesn't show twice
+        $('h1').remove();
+        
+        // Cleanup other elements
         $('script').remove();
         $('img').remove();
+
+        const displayTitle = realTitle || `Aizu ${randomId}`;
 
         const testCases = [];
         let currentInput = null;
 
-        // --- IMPROVED PARSING LOGIC ---
-        // Aizu ITP1 problems usually have "Sample Input X" followed by <pre>
-        // But sometimes they are just "Input" / "Output"
-        
-        // 1. Get all text-containing elements in order
-        const allElements = $('h2, h3, p, div, pre');
-
-        allElements.each((i, el) => {
-            const text = $(el).text().trim().toLowerCase();
-            const tagName = $(el).prop('tagName').toLowerCase();
-
-            // Detect Input Header
-            if (text.includes('sample input') || (text === 'input' && tagName.startsWith('h'))) {
-                // Look ahead for the next PRE tag
-                let nextEl = $(el).next();
-                // Skip empty text nodes or BRs
-                while(nextEl.length && !nextEl.is('pre') && !nextEl.text().trim()) {
-                    nextEl = nextEl.next();
-                }
-                
+        // Robust parsing for Aizu format (Headers followed by PRE tags)
+        $('h2, h3, p, div').each((i, el) => {
+            const text = $(el).text().toLowerCase();
+            
+            if (text.includes('sample input')) {
+                const nextEl = $(el).next();
                 if (nextEl.is('pre')) {
                     currentInput = nextEl.text().trim();
                 }
-            } 
-            // Detect Output Header
-            else if ((text.includes('sample output') || (text === 'output' && tagName.startsWith('h'))) && currentInput !== null) {
-                let nextEl = $(el).next();
-                while(nextEl.length && !nextEl.is('pre') && !nextEl.text().trim()) {
-                    nextEl = nextEl.next();
-                }
-
+            } else if (text.includes('sample output') && currentInput !== null) {
+                const nextEl = $(el).next();
                 if (nextEl.is('pre')) {
                     const output = nextEl.text().trim();
                     testCases.push({ input: currentInput, expectedOutput: output });
-                    currentInput = null; // Reset pair
+                    currentInput = null;
                 }
             }
         });
 
-        // Fail-safe: If regex/cheerio extraction failed, fallback to a generic extract if literal description is clean
         if (testCases.length === 0) {
-            console.warn(`[AIZU] Warning: No test cases extracted for ${randomId}. Dumping HTML snippet for debug.`);
-            // console.log(htmlContent.substring(0, 200)); 
-            // Return null so the backend triggers the Fallback Problem (which has valid test cases)
-            return null;
+            console.warn(`[AIZU] Warning: No test cases extracted for ${randomId}.`);
         }
 
-        console.log(`[AIZU] Successfully extracted ${testCases.length} test cases for ${randomId}`);
-
         const starterCode = {
-            javascript: `// Solve Aizu Problem ${randomId}\nconst fs = require('fs');\nconst input = fs.readFileSync('/dev/stdin').toString().trim().split('\\n');\n// Write code here\n`,
-            python: `# Solve Aizu Problem ${randomId}\nimport sys\nlines = sys.stdin.readlines()\n# Write code here\n`,
-            cpp: `// Solve Aizu Problem ${randomId}\n#include <iostream>\nusing namespace std;\nint main() {\n    return 0;\n}`,
-            java: `// Solve Aizu Problem ${randomId}\nimport java.util.Scanner;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n    }\n}`
+            javascript: `// Solve ${displayTitle}\nconst fs = require('fs');\nconst input = fs.readFileSync('/dev/stdin').toString().trim().split('\\n');\n// Write code here\n`,
+            python: `# Solve ${displayTitle}\nimport sys\nlines = sys.stdin.readlines()\n# Write code here\n`,
+            cpp: `// Solve ${displayTitle}\n#include <iostream>\nusing namespace std;\nint main() {\n    return 0;\n}`,
+            java: `// Solve ${displayTitle}\nimport java.util.Scanner;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n    }\n}`
         };
 
         return {
             problemId: randomId,
-            title: `Aizu ${randomId}`,
-            description: htmlContent, 
+            title: displayTitle, 
+            description: $.html(), // Return modified HTML (without H1)
             descriptionUrl: `https://onlinejudge.u-aizu.ac.jp/problems/${randomId}`,
             testCases: testCases,
             starterCode: starterCode
