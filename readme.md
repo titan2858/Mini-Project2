@@ -1,156 +1,157 @@
-⚔️ AlgoBattle - Real-Time 1v1 Coding Competition Platform
+# ⚔️ AlgoBattle - Real-Time 1v1 Coding Competition Platform
 
 AlgoBattle is a competitive coding platform where developers compete against each other in real-time. It simulates the high-pressure environment of technical interviews with live 1v1 coding battles, integrated compilation, and AI-powered performance analysis.
 
-🚀 Key Features
+## 🚀 Key Features
 
-🎮 Real-Time Multiplayer
+### 🎮 Real-Time Multiplayer
 
-Instant Matchmaking: Create or join battle rooms via unique Room IDs.
+- **Instant Matchmaking**: Create or join battle rooms via unique Room IDs.
+- **Live Sync**: Game state, player connection status, and progress bars are synchronized in real-time using Socket.io.
+- **1-Minute Prep Timer**: A dedicated countdown ensures both players are ready before the problem is revealed.
 
-Live Sync: Game state, player connection status, and progress bars are synchronized in real-time using Socket.io.
+### 💻 Advanced Coding Arena
 
-1-Minute Prep Timer: A dedicated countdown ensures both players are ready before the problem is revealed.
+- **Monaco Editor**: Integrated VS Code-like editor with syntax highlighting for JavaScript, Python, C++, and Java.
+- **Live Compilation**: Execute code against sample test cases using the JDoodle API.
+- **Dynamic Problem Fetching**: Problems are fetched in real-time from the Aizu Online Judge API, ensuring a limitless pool of questions.
+- **Hidden Test Cases**: Submissions are validated against hidden test cases to determine the true winner.
 
-💻 Advanced Coding Arena
+### 🤖 AI Coach (Powered by Gemini)
 
-Monaco Editor: Integrated VS Code-like editor with syntax highlighting for JavaScript, Python, C++, and Java.
+- **Post-Match Analysis**: After the battle, the Google Gemini AI analyzes your code.
+- **Smart Feedback**: Get detailed insights on Time Complexity, Space Complexity, and specific suggestions to optimize your solution.
 
-Live Compilation: Execute code against sample test cases using the JDoodle API.
+### 🛡️ Anti-Cheat System
 
-Dynamic Problem Fetching: Problems are fetched in real-time from the Aizu Online Judge API, ensuring a limitless pool of questions.
+- **Tab Switching Detection**: The platform monitors page visibility. If a user switches tabs (e.g., to Google answers), they receive a strike.
+- **3-Strike Disqualification**: Upon the 3rd strike, the player is automatically disqualified, and the opponent wins.
 
-Hidden Test Cases: Submissions are validated against hidden test cases to determine the true winner.
+### 🏆 Ranking & Profiles
 
-🤖 AI Coach (Powered by Gemini)
+- **Dynamic Ranks**: Climb the ladder from Novice to Grandmaster based on your win count.
+- **Match History**: Track your past battles, wins, losses, and opponents.
 
-Post-Match Analysis: After the battle, the Google Gemini AI analyzes your code.
+## 🛠️ Tech Stack
 
-Smart Feedback: Get detailed insights on Time Complexity, Space Complexity, and specific suggestions to optimize your solution.
+### Frontend
 
-🛡️ Anti-Cheat System
+- **React.js (Vite)**: Fast, component-based UI.
+- **Tailwind CSS**: Modern, responsive styling.
+- **Monaco Editor**: The code editor engine that powers VS Code.
+- **Lucide React**: Beautiful, consistent iconography.
+- **Socket.io-client**: Real-time bi-directional communication.
 
-Tab Switching Detection: The platform monitors page visibility. If a user switches tabs (e.g., to Google answers), they receive a strike.
+### Backend
 
-3-Strike Disqualification: Upon the 3rd strike, the player is automatically disqualified, and the opponent wins.
+- **Node.js & Express.js**: RESTful API and server logic.
+- **MongoDB & Mongoose**: NoSQL database for storing users, matches, and history.
+- **Socket.io**: Handling WebSocket connections for rooms and game state.
+- **Cheerio**: For scraping/parsing problem data from external judges.
 
-🏆 Ranking & Profiles
+### External APIs
 
-Dynamic Ranks: Climb the ladder from Novice to Grandmaster based on your win count.
+- **Google Gemini API**: For AI code analysis.
+- **JDoodle API**: For remote code compilation and execution.
+- **Aizu Online Judge API**: For fetching algorithmic problems.
 
-Match History: Track your past battles, wins, losses, and opponents.
-
-🛠️ Tech Stack
-
-Frontend
-
-React.js (Vite): Fast, component-based UI.
-
-Tailwind CSS: Modern, responsive styling.
-
-Monaco Editor: The code editor engine that powers VS Code.
-
-Lucide React: Beautiful, consistent iconography.
-
-Socket.io-client: Real-time bi-directional communication.
-
-Backend
-
-Node.js & Express.js: RESTful API and server logic.
-
-MongoDB & Mongoose: NoSQL database for storing users, matches, and history.
-
-Socket.io: Handling WebSocket connections for rooms and game state.
-
-Cheerio: For scraping/parsing problem data from external judges.
-
-External APIs
-
-Google Gemini API: For AI code analysis.
-
-JDoodle API: For remote code compilation and execution.
-
-Aizu Online Judge API: For fetching algorithmic problems.
-
-⚙️ Local Setup & Installation
+## ⚙️ Local Setup & Installation
 
 Follow these steps to run the project locally.
 
-Clone the Repository
-git clone https://github.com/titan2858/Clash-Of-Coders.git cd Clash-Of-Coders
+### 1. Clone the Repository
 
-Backend Setup
+```bash
+git clone https://github.com/titan2858/Clash-Of-Coders.git
+cd Clash-Of-Coders
+```
+
+### 2. Backend Setup
+
 Navigate to the backend folder, install dependencies, and configure environment variables.
 
-cd backend npm install
+```bash
+cd backend
+npm install
+```
 
-Create a .env file in the backend directory:
+Create a `.env` file in the backend directory:
 
-PORT=5000 MONGO_URI=your_mongodb_connection_string JWT_SECRET=your_jwt_secret_key
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret_key
 
-JDoodle Compiler Credentials (https://www.jdoodle.com/compiler-api/)
-JDOODLE_CLIENT_ID=your_jdoodle_client_id JDOODLE_CLIENT_SECRET=your_jdoodle_client_secret
+# JDoodle Compiler Credentials (https://www.jdoodle.com/compiler-api/)
+JDOODLE_CLIENT_ID=your_jdoodle_client_id
+JDOODLE_CLIENT_SECRET=your_jdoodle_client_secret
 
-Google Gemini AI Key (https://aistudio.google.com/)
+# Google Gemini AI Key (https://aistudio.google.com/)
 GEMINI_API_KEY=your_gemini_api_key
+```
 
 Start the Backend Server:
 
+```bash
 npm start
+```
 
-The server will run on http://localhost:5000
+The server will run on `http://localhost:5000`
 
-Frontend Setup
+### 3. Frontend Setup
+
 Open a new terminal, navigate to the frontend folder, and install dependencies.
 
-cd frontend npm install
+```bash
+cd frontend
+npm install
+```
 
 Start the React Development Server:
 
+```bash
 npm run dev
+```
 
-The app will run on http://localhost:5173
+The app will run on `http://localhost:5173`
 
-📖 How It Works
+## 📖 How It Works
 
-Register/Login: Create an account to track your Elo and stats.
+1. **Register/Login**: Create an account to track your Elo and stats.
+2. **Dashboard**: Click "Create Battle Room" to get a Room ID.
+3. **Invite**: Share the Room ID with a friend.
+4. **Lobby**: Once both players join, a 60-second countdown begins.
+5. **Battle**:
+   - Read the problem description.
+   - Write your code in your preferred language.
+   - Use "Run" to test against public cases.
+   - Click "Submit" to validate against hidden cases.
+6. **Victory**: The first player to pass all hidden test cases wins!
+7. **Review**: Use the "Analyze My Code" button to get AI feedback on your solution.
 
-Dashboard: Click "Create Battle Room" to get a Room ID.
-
-Invite: Share the Room ID with a friend.
-
-Lobby: Once both players join, a 60-second countdown begins.
-
-Battle: * Read the problem description.
-
-Write your code in your preferred language.
-
-Use "Run" to test against public cases.
-
-Click "Submit" to validate against hidden cases.
-
-Victory: The first player to pass all hidden test cases wins!
-
-Review: Use the "Analyze My Code" button to get AI feedback on your solution.
-
-🤝 Contributing
+## 🤝 Contributing
 
 Contributions are always welcome!
 
-Fork the repository.
+1. Fork the repository.
+2. Create a new branch:
+   ```bash
+   git checkout -b feature/AmazingFeature
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m 'Add some AmazingFeature'
+   ```
+4. Push to the branch:
+   ```bash
+   git push origin feature/AmazingFeature
+   ```
+5. Open a Pull Request.
 
-Create a new branch (git checkout -b feature/AmazingFeature).
-
-Commit your changes (git commit -m 'Add some AmazingFeature').
-
-Push to the branch (git push origin feature/AmazingFeature).
-
-Open a Pull Request.
-
-📄 License
+## 📄 License
 
 This project is licensed under the MIT License.
 
-Author
+## Author
 
-Built with ❤️ by Hrishikesh Bankapur
+Built with ❤️ by **Hrishikesh Bankapur**
