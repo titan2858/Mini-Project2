@@ -136,7 +136,9 @@ Invite: Share the Room ID with a friend.
 
 Lobby: Once both players join, a 60-second countdown begins.
 
-Battle: * Read the problem description.
+Battle:
+
+Read the problem description.
 
 Write your code in your preferred language.
 
