@@ -515,7 +515,7 @@ const Arena = () => {
                       {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />} Analyze My Code
                   </button>
 
-                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
+                  <button onClick={() => navigate('/dashboard')} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
                       Return to Dashboard
                   </button>
               </div>
