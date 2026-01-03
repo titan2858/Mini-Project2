@@ -20,7 +20,11 @@ const Arena = () => {
   const [gameTimer, setGameTimer] = useState(0); 
   const [problem, setProblem] = useState(null);
   const [language, setLanguage] = useState('javascript');
-  const [code, setCode] = useState('// Waiting for game to start...');
+  
+  // --- FIX: Restore Code from Session Storage ---
+  const [code, setCode] = useState(() => {
+      return sessionStorage.getItem(`code_${roomId}`) || '// Waiting for game to start...';
+  });
   
   // UI State
   const [activeTab, setActiveTab] = useState('description');
@@ -45,6 +49,13 @@ const Arena = () => {
   const [opponentProgress, setOpponentProgress] = useState(0);
   const [winner, setWinner] = useState(null);
   const [winReason, setWinReason] = useState(null);
+
+  // --- FIX: Save Code to Session Storage on Change ---
+  useEffect(() => {
+      if (code && roomId) {
+          sessionStorage.setItem(`code_${roomId}`, code);
+      }
+  }, [code, roomId]);
 
   useEffect(() => {
     let username = 'Guest';
@@ -91,10 +102,15 @@ const Arena = () => {
       const durationMs = data.gameDuration || (30 * 60 * 1000);
       setGameTimer(Math.ceil(durationMs / 1000));
 
-      if (data.problem.starterCode && data.problem.starterCode['javascript']) {
-        setCode(data.problem.starterCode['javascript']);
-      } else {
-        setCode('// Write your code here...');
+      // Only set starter code if user hasn't written anything yet
+      // This prevents overwriting their work if they reconnect
+      const savedCode = sessionStorage.getItem(`code_${roomId}`);
+      if (!savedCode || savedCode === '// Waiting for game to start...') {
+          if (data.problem.starterCode && data.problem.starterCode['javascript']) {
+            setCode(data.problem.starterCode['javascript']);
+          } else {
+            setCode('// Write your code here...');
+          }
       }
     };
 
@@ -157,7 +173,10 @@ const Arena = () => {
       return () => clearInterval(interval);
   }, [status, gameTimer]); 
 
-  // --- NEW: ANTI-CHEAT VISIBILITY DETECTION ---
+  // ... (Keep existing Anti-Cheat, formatTime, Handlers, etc.) ...
+  // [Rest of the file remains exactly the same as previous version]
+  
+  // --- ANTI-CHEAT ---
   useEffect(() => {
       const handleVisibilityChange = () => {
           if (document.hidden && status === 'playing') {
@@ -165,15 +184,11 @@ const Arena = () => {
                   const newStrikes = prev + 1;
                   
                   if (newStrikes >= 3) {
-                      // Disqualify User
                       setStatus('finished');
                       setWinReason('disqualified');
-                      setWinner('opponent'); // Force opponent win locally so this user sees Defeat
-                      
-                      // Notify Server to declare opponent winner
+                      setWinner('opponent');
                       socket.emit('player_disqualified', { roomId });
                   } else {
-                      // Warning
                       alert(`⚠️ ANTI-CHEAT WARNING!\n\nTab switching is not allowed during battle.\nStrike ${newStrikes}/3.\n\nAt 3 strikes you will be disqualified.`);
                   }
                   return newStrikes;
@@ -199,11 +214,12 @@ const Arena = () => {
       }
   };
 
-  // --- ACTION: RUN CODE (Public Test Case) ---
+  // --- ACTION: RUN CODE ---
   const handleRun = async () => {
       if (!problem) return;
       setIsRunning(true);
       setConsoleTab('testcase'); 
+      setActiveTestCaseId(0); 
       setRunResult(null);
       setSubmitResult(null); 
 
@@ -221,7 +237,7 @@ const Arena = () => {
       }
   };
 
-  // --- ACTION: SUBMIT CODE (Hidden Test Cases) ---
+  // --- ACTION: SUBMIT CODE ---
   const handleSubmit = async () => {
       if (!problem) return;
       setIsSubmitting(true);
@@ -282,7 +298,7 @@ const Arena = () => {
       }
   };
 
-  // --- AI ANALYSIS HANDLER ---
+  // --- AI ANALYSIS ---
   const handleAnalyze = async () => {
       if (!code || code.length < 10) return; 
       
@@ -349,14 +365,12 @@ const Arena = () => {
                 <Code2 className="w-4 h-4" /> Description
             </button>
             <div className="flex items-center gap-4">
-                {/* --- NEW: STRIKES INDICATOR --- */}
                 {strikes > 0 && (
                     <div className="flex items-center gap-1 bg-red-500/20 px-2 py-0.5 rounded text-red-400 border border-red-500/30 text-xs font-bold animate-pulse">
                         <AlertTriangle className="w-3 h-3" />
                         <span>{strikes}/3 Strikes</span>
                     </div>
                 )}
-
                 <div className="flex items-center gap-2 text-gray-300 bg-[#1a1a1a] px-3 py-1 rounded-full text-xs border border-[#444]">
                     <Timer className="w-3 h-3 text-orange-500" />
                     <span className="font-mono font-bold">{formatTime(gameTimer)}</span>
@@ -441,15 +455,25 @@ const Arena = () => {
                                     
                                     {/* --- FIX: Display RUN Results Here --- */}
                                     {runResult && runResult.success && (
-                                        <>
-                                            <div className="pt-2 border-t border-[#333] mt-2">
-                                                <div className={`text-xs font-bold mb-2 ${runResult.result.passed ? 'text-green-500' : 'text-red-500'}`}>
-                                                    {runResult.result.passed ? 'Accepted' : 'Wrong Answer'}
-                                                </div>
-                                                <div className="mb-2"><span className="text-gray-500 block mb-1">Your Output:</span><div className={`p-3 rounded border border-[#333] ${runResult.result.passed ? 'bg-[#1e1e1e] text-gray-300' : 'bg-red-900/10 text-red-400'}`}>{runResult.result.actual}</div></div>
-                                                <div><span className="text-gray-500 block mb-1">Expected Output:</span><div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300">{runResult.result.expected}</div></div>
+                                        <div className="pt-4 mt-4 border-t border-gray-700">
+                                            <div className={`text-sm font-bold mb-2 ${runResult.result.passed ? 'text-green-500' : 'text-red-500'}`}>
+                                                {runResult.result.passed ? 'Accepted' : 'Wrong Answer'}
                                             </div>
-                                        </>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <span className="text-gray-500 text-xs uppercase tracking-wider block mb-1">Your Output</span>
+                                                    <div className={`p-3 rounded-lg border ${runResult.result.passed ? 'bg-slate-900/50 border-slate-700 text-gray-300' : 'bg-red-900/10 border-red-900/30 text-red-400'} font-mono text-sm`}>
+                                                        {runResult.result.actual}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 text-xs uppercase tracking-wider block mb-1">Expected Output</span>
+                                                    <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700 text-gray-300 font-mono text-sm">
+                                                        {runResult.result.expected}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                              )}
@@ -515,7 +539,7 @@ const Arena = () => {
                       {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />} Analyze My Code
                   </button>
 
-                  <button onClick={() => navigate('/dashboard')} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
+                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
                       Return to Dashboard
                   </button>
               </div>
