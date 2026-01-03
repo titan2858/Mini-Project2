@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { 
   Play, Loader2, Trophy, Terminal, Code2, XCircle, ArrowLeft, CheckCircle2, 
-  AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X, AlertTriangle
+  AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X, AlertTriangle, Maximize
 } from 'lucide-react';
 import { socket } from '../utils/socket';
 import api, { analyzeCode } from '../utils/api';
@@ -20,11 +20,7 @@ const Arena = () => {
   const [gameTimer, setGameTimer] = useState(0); 
   const [problem, setProblem] = useState(null);
   const [language, setLanguage] = useState('javascript');
-  
-  // --- FIX: Restore Code from Session Storage ---
-  const [code, setCode] = useState(() => {
-      return sessionStorage.getItem(`code_${roomId}`) || '// Waiting for game to start...';
-  });
+  const [code, setCode] = useState('// Waiting for game to start...');
   
   // UI State
   const [activeTab, setActiveTab] = useState('description');
@@ -50,12 +46,17 @@ const Arena = () => {
   const [winner, setWinner] = useState(null);
   const [winReason, setWinReason] = useState(null);
 
-  // --- FIX: Save Code to Session Storage on Change ---
+  // --- NEW: TRIGGER FULL SCREEN ON START ---
   useEffect(() => {
-      if (code && roomId) {
-          sessionStorage.setItem(`code_${roomId}`, code);
-      }
-  }, [code, roomId]);
+    if (status === 'starting') {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch((err) => {
+                console.log("Full screen denied:", err);
+            });
+        }
+    }
+  }, [status]);
 
   useEffect(() => {
     let username = 'Guest';
@@ -102,15 +103,10 @@ const Arena = () => {
       const durationMs = data.gameDuration || (30 * 60 * 1000);
       setGameTimer(Math.ceil(durationMs / 1000));
 
-      // Only set starter code if user hasn't written anything yet
-      // This prevents overwriting their work if they reconnect
-      const savedCode = sessionStorage.getItem(`code_${roomId}`);
-      if (!savedCode || savedCode === '// Waiting for game to start...') {
-          if (data.problem.starterCode && data.problem.starterCode['javascript']) {
-            setCode(data.problem.starterCode['javascript']);
-          } else {
-            setCode('// Write your code here...');
-          }
+      if (data.problem.starterCode && data.problem.starterCode['javascript']) {
+        setCode(data.problem.starterCode['javascript']);
+      } else {
+        setCode('// Write your code here...');
       }
     };
 
@@ -144,6 +140,7 @@ const Arena = () => {
       socket.off('opponent_progress', handleOpponentProgress);
       socket.off('game_over', handleGameOver);
       socket.off('error', handleError);
+      socket.disconnect();
     };
   }, [roomId, navigate]);
 
@@ -173,9 +170,6 @@ const Arena = () => {
       return () => clearInterval(interval);
   }, [status, gameTimer]); 
 
-  // ... (Keep existing Anti-Cheat, formatTime, Handlers, etc.) ...
-  // [Rest of the file remains exactly the same as previous version]
-  
   // --- ANTI-CHEAT ---
   useEffect(() => {
       const handleVisibilityChange = () => {
@@ -214,7 +208,6 @@ const Arena = () => {
       }
   };
 
-  // --- ACTION: RUN CODE ---
   const handleRun = async () => {
       if (!problem) return;
       setIsRunning(true);
@@ -237,7 +230,6 @@ const Arena = () => {
       }
   };
 
-  // --- ACTION: SUBMIT CODE ---
   const handleSubmit = async () => {
       if (!problem) return;
       setIsSubmitting(true);
@@ -298,7 +290,6 @@ const Arena = () => {
       }
   };
 
-  // --- AI ANALYSIS ---
   const handleAnalyze = async () => {
       if (!code || code.length < 10) return; 
       
@@ -320,20 +311,21 @@ const Arena = () => {
 
   if (status === 'waiting') {
     return (
-      <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
+      <div className="h-screen flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
         <Loader2 className="w-12 h-12 animate-spin text-green-500 mb-4" />
         <h2 className="text-2xl font-bold mb-2">Waiting for Opponent...</h2>
         <div className="bg-[#2a2a2a] px-6 py-3 rounded-lg flex items-center gap-4 border border-gray-700">
            <span className="font-mono text-xl tracking-wider text-green-400">{roomId}</span>
            <span className="text-sm text-gray-400">Share this Room ID</span>
         </div>
+        <button onClick={() => navigate('/dashboard')} className="mt-8 flex items-center gap-2 text-gray-400 hover:text-white"><ArrowLeft className="w-4 h-4"/> Leave</button>
       </div>
     );
   }
 
   if (status === 'starting') {
       return (
-        <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
+        <div className="h-screen flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
             <div className="relative">
                 <Swords className="w-24 h-24 text-orange-500 animate-pulse mb-8 mx-auto" />
             </div>
@@ -356,7 +348,7 @@ const Arena = () => {
   const testCases = problem?.examples || [];
 
   return (
-    <div className="h-[calc(100vh-64px)] flex bg-[#1e1e1e] text-white overflow-hidden font-sans relative">
+    <div className="h-screen flex bg-[#1e1e1e] text-white overflow-hidden font-sans relative">
       
       {/* LEFT PANEL */}
       <div className="w-5/12 flex flex-col border-r border-[#333] bg-[#262626]">
@@ -453,7 +445,7 @@ const Arena = () => {
                                 <div className="space-y-4">
                                     <div><span className="text-gray-500 block mb-1">Input:</span><div className="bg-[#1e1e1e] p-3 rounded border border-[#333] text-gray-300">{testCases[activeTestCaseId].input}</div></div>
                                     
-                                    {/* --- FIX: Display RUN Results Here --- */}
+                                    {/* RUN Results */}
                                     {runResult && runResult.success && (
                                         <div className="pt-4 mt-4 border-t border-gray-700">
                                             <div className={`text-sm font-bold mb-2 ${runResult.result.passed ? 'text-green-500' : 'text-red-500'}`}>
@@ -539,7 +531,7 @@ const Arena = () => {
                       {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />} Analyze My Code
                   </button>
 
-                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
+                  <button onClick={() => navigate('/dashboard')} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
                       Return to Dashboard
                   </button>
               </div>
