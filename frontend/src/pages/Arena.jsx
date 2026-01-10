@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { 
   Play, Loader2, Trophy, Terminal, Code2, XCircle, ArrowLeft, CheckCircle2, 
-  AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X, AlertTriangle, Maximize
+  AlertCircle, Clock, Swords, Timer, Sparkles, BrainCircuit, X, AlertTriangle
 } from 'lucide-react';
 import { socket } from '../utils/socket';
 import api, { analyzeCode } from '../utils/api';
@@ -45,18 +45,6 @@ const Arena = () => {
   const [opponentProgress, setOpponentProgress] = useState(0);
   const [winner, setWinner] = useState(null);
   const [winReason, setWinReason] = useState(null);
-
-  // --- NEW: TRIGGER FULL SCREEN ON START ---
-  useEffect(() => {
-    if (status === 'starting') {
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch((err) => {
-                console.log("Full screen denied:", err);
-            });
-        }
-    }
-  }, [status]);
 
   useEffect(() => {
     let username = 'Guest';
@@ -170,7 +158,7 @@ const Arena = () => {
       return () => clearInterval(interval);
   }, [status, gameTimer]); 
 
-  // --- ANTI-CHEAT ---
+  // --- ANTI-CHEAT (TAB SWITCH) ---
   useEffect(() => {
       const handleVisibilityChange = () => {
           if (document.hidden && status === 'playing') {
@@ -208,6 +196,32 @@ const Arena = () => {
       }
   };
 
+  // --- ANTI-CHEAT (DISABLE PASTE) ---
+  const handleEditorDidMount = (editor, monaco) => {
+      // 1. Block Right-Click Paste / Standard Paste Event
+      const domNode = editor.getContainerDomNode();
+      domNode.addEventListener('paste', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          alert("⚠️ Anti-Cheat: Copy-Pasting is disabled in the Arena!");
+      }, true); 
+
+      // 2. Block Keyboard Shortcuts (Ctrl+V / Cmd+V)
+      editor.onKeyDown((e) => {
+          const { keyCode, ctrlKey, metaKey } = e;
+          // 52 is the KeyCode for 'V' in Monaco
+          if ((ctrlKey || metaKey) && keyCode === 52) {
+              e.preventDefault();
+              e.stopPropagation();
+              alert("⚠️ Anti-Cheat: Copy-Pasting is disabled via Keyboard!");
+          }
+      });
+      
+      // 3. Disable Context Menu entirely (Optional, for stricter feel)
+      // editor.updateOptions({ contextmenu: false });
+  };
+
+  // --- ACTION: RUN CODE ---
   const handleRun = async () => {
       if (!problem) return;
       setIsRunning(true);
@@ -230,6 +244,7 @@ const Arena = () => {
       }
   };
 
+  // --- ACTION: SUBMIT CODE ---
   const handleSubmit = async () => {
       if (!problem) return;
       setIsSubmitting(true);
@@ -290,6 +305,7 @@ const Arena = () => {
       }
   };
 
+  // --- AI ANALYSIS ---
   const handleAnalyze = async () => {
       if (!code || code.length < 10) return; 
       
@@ -311,21 +327,20 @@ const Arena = () => {
 
   if (status === 'waiting') {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
+      <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
         <Loader2 className="w-12 h-12 animate-spin text-green-500 mb-4" />
         <h2 className="text-2xl font-bold mb-2">Waiting for Opponent...</h2>
         <div className="bg-[#2a2a2a] px-6 py-3 rounded-lg flex items-center gap-4 border border-gray-700">
            <span className="font-mono text-xl tracking-wider text-green-400">{roomId}</span>
            <span className="text-sm text-gray-400">Share this Room ID</span>
         </div>
-        <button onClick={() => navigate('/dashboard')} className="mt-8 flex items-center gap-2 text-gray-400 hover:text-white"><ArrowLeft className="w-4 h-4"/> Leave</button>
       </div>
     );
   }
 
   if (status === 'starting') {
       return (
-        <div className="h-screen flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
+        <div className="h-[calc(100vh-64px)] flex flex-col items-center justify-center bg-[#1a1a1a] text-white">
             <div className="relative">
                 <Swords className="w-24 h-24 text-orange-500 animate-pulse mb-8 mx-auto" />
             </div>
@@ -348,7 +363,7 @@ const Arena = () => {
   const testCases = problem?.examples || [];
 
   return (
-    <div className="h-screen flex bg-[#1e1e1e] text-white overflow-hidden font-sans relative">
+    <div className="h-[calc(100vh-64px)] flex bg-[#1e1e1e] text-white overflow-hidden font-sans relative">
       
       {/* LEFT PANEL */}
       <div className="w-5/12 flex flex-col border-r border-[#333] bg-[#262626]">
@@ -424,7 +439,20 @@ const Arena = () => {
             </div>
         </div>
         <div className="flex-1">
-            <Editor height="100%" defaultLanguage="javascript" language={language} theme="vs-dark" value={code} onChange={setCode} options={{ minimap: { enabled: false }, fontSize: 14, automaticLayout: true }} />
+            <Editor 
+                height="100%" 
+                defaultLanguage="javascript" 
+                language={language} 
+                theme="vs-dark" 
+                value={code} 
+                onChange={setCode} 
+                onMount={handleEditorDidMount} 
+                options={{ 
+                    minimap: { enabled: false }, 
+                    fontSize: 14, 
+                    automaticLayout: true 
+                }} 
+            />
         </div>
         <div className="h-1/3 min-h-[200px] border-t border-[#333] bg-[#262626] flex flex-col">
             <div className="h-9 flex items-center bg-[#333] px-1 gap-1">
@@ -531,7 +559,7 @@ const Arena = () => {
                       {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4" />} Analyze My Code
                   </button>
 
-                  <button onClick={() => navigate('/dashboard')} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
+                  <button onClick={() => window.location.href = '/dashboard'} className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition-colors">
                       Return to Dashboard
                   </button>
               </div>
